@@ -1,55 +1,70 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from wordcloud import WordCloud
 
-# Load data
-df = pd.read_csv("indo_sentiment_results.csv")
+from youtube_crawling import YoutubeCrawling
+from comment_preprocessing import CommentPreprocessing
+from sentiment_analysis import IndoBertSentiment
 
-st.title("📊 Visualisasi Analisis Sentimen")
+# Konfigurasi API YouTube
+YOUTUBE_API_KEY = "AIzaSyCwGg_Quc1Ie99GeTvaoF_BHpqWcj0sdDc"
 
-# 1️⃣ Bar Chart Sentimen
-st.subheader("Distribusi Sentimen")
-sentiment_counts = df['sentiment'].value_counts()
+# Inisialisasi objek
+crawler = YoutubeCrawling(YOUTUBE_API_KEY)
+preprocessor = CommentPreprocessing()
+sentiment_analyzer = IndoBertSentiment()
 
-fig, ax = plt.subplots(figsize=(8, 5))
-sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values, palette="coolwarm", ax=ax)
-ax.set_xlabel("Sentimen")
-ax.set_ylabel("Jumlah Komentar")
-ax.set_title("Distribusi Sentimen dalam Dataset")
-st.pyplot(fig)
+# Streamlit UI
+st.title("Analisis Sentimen Komentar YouTube dengan IndoBERT")
+st.write("Masukkan link video YouTube dan jumlah komentar yang ingin dianalisis.")
 
-# 2️⃣ Pie Chart Sentimen
-st.subheader("Proporsi Sentimen")
+# Input pengguna
+video_url = st.text_input("Masukkan URL Video YouTube")
+num_comments = st.number_input("Jumlah komentar yang ingin diambil", min_value=1, value=100, step=10)
 
-fig, ax = plt.subplots()
-ax.pie(sentiment_counts, labels=sentiment_counts.index, autopct='%1.1f%%', colors=['lightcoral', 'gold', 'lightblue'])
-ax.set_title("Persentase Sentimen")
-st.pyplot(fig)
+if st.button("Analisis Sentimen"):
+    if not video_url:
+        st.error("Harap masukkan URL YouTube.")
+    else:
+        st.info("Mengambil komentar dari YouTube...")
+        try:
+            comments = crawler.get_comments(video_url, max_comments=num_comments)
 
-# 3️⃣ Word Cloud untuk Setiap Sentimen
-st.subheader("Word Cloud Berdasarkan Sentimen")
-sentiment_types = df['sentiment'].unique()
+            if len(comments) == 0:
+                st.warning("Tidak ada komentar yang ditemukan.")
+            elif len(comments) < num_comments:
+                st.warning(f"Hanya ditemukan {len(comments)} komentar dari {num_comments} yang diminta.")
 
-for sentiment in sentiment_types:
-    st.write(f"**{sentiment.capitalize()}**")
-    text = " ".join(df[df['sentiment'] == sentiment]['clean_comment'].astype(str))
-    wordcloud = WordCloud(width=800, height=400, background_color="white").generate(text)
-    
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.imshow(wordcloud, interpolation="bilinear")
-    ax.axis("off")
-    st.pyplot(fig)
+            st.success(f"Ditemukan {len(comments)} komentar. Memproses sentimen...")
 
-# 4️⃣ Histogram Panjang Komentar
-st.subheader("Distribusi Panjang Komentar")
+            # Cleansing data
+            cleaned_comments = [preprocessor.clean_text(comment) for comment in comments]
 
-df["comment_length"] = df["clean_comment"].astype(str).apply(len)
+            # Analisis sentimen
+            results = [{"Komentar": comment, "Sentimen": sentiment_analyzer.predict(comment)} for comment in cleaned_comments]
+            df = pd.DataFrame(results)
 
-fig, ax = plt.subplots(figsize=(8, 5))
-sns.histplot(df["comment_length"], bins=30, kde=True, color="purple")
-ax.set_xlabel("Panjang Komentar")
-ax.set_ylabel("Frekuensi")
-ax.set_title("Histogram Panjang Komentar")
-st.pyplot(fig)
+            # Menampilkan hasil
+            st.write("### Hasil Analisis Sentimen")
+            st.dataframe(df)
+
+            # Visualisasi hasil
+            sentiment_counts = df["Sentimen"].value_counts()
+            fig, ax = plt.subplots()
+            colors = {
+                "Positif": "green",
+                "Netral": "gray",
+                "Negatif": "red"
+            }
+            ax.bar(sentiment_counts.index, sentiment_counts.values, color=[colors[label] for label in sentiment_counts.index])
+            ax.set_title("Distribusi Sentimen")
+            ax.set_xlabel("Sentimen")
+            ax.set_ylabel("Jumlah Komentar")
+            st.pyplot(fig)
+
+            # Download hasil sebagai CSV
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button(label="📥 Download CSV", data=csv, file_name="sentimen_youtube.csv", mime="text/csv")
+
+        except Exception as e:
+            st.error(f"Terjadi kesalahan: {e}")
