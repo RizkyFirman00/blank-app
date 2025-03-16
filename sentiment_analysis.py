@@ -2,7 +2,7 @@ import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 class IndoBertSentiment:
-    def __init__(self, model_name="indobenchmark/indobert-large-p1"):
+    def __init__(self, model_name="indobenchmark/indobert-base-p1"):
         """Memuat model dan tokenizer IndoBERT."""
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=3)  # Positif, Netral, Negatif
