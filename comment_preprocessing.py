@@ -1,7 +1,11 @@
 import re
-import string
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 
 class CommentPreprocessing:
+    # Inisialisasi stemmer Sastrawi
+    factory = StemmerFactory()
+    stemmer = factory.create_stemmer()
+
     @staticmethod
     def remove_urls(text: str) -> str:
         """Menghapus URL dari teks."""
@@ -17,11 +21,17 @@ class CommentPreprocessing:
         """Menghapus spasi berlebihan."""
         return re.sub(r"\s+", " ", text).strip()
 
-    @staticmethod
-    def clean_text(text: str) -> str:
+    @classmethod
+    def stemming(cls, text: str) -> str:
+        """Melakukan stemming pada teks menggunakan Sastrawi."""
+        return cls.stemmer.stem(text)
+
+    @classmethod
+    def clean_text(cls, text: str) -> str:
         """Melakukan pembersihan lengkap pada teks."""
         text = text.lower()  # Ubah ke huruf kecil
-        text = CommentPreprocessing.remove_urls(text)
-        text = CommentPreprocessing.remove_special_characters(text)
-        text = CommentPreprocessing.remove_extra_spaces(text)
+        text = cls.remove_urls(text)
+        text = cls.remove_special_characters(text)
+        text = cls.remove_extra_spaces(text)
+        text = cls.stemming(text)  # Lakukan stemming
         return text
